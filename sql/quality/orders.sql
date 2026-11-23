@@ -68,3 +68,14 @@ SELECT
     'sinalizar',
     'Datas intermediárias inconsistentes; o prazo compra -> entrega continua válido',
     (SELECT count(*) FROM silver.orders WHERE dq_delivered_before_carrier)
+
+UNION ALL
+SELECT
+    'ORD-08', 'orders',
+    'Pedido parado em status intermediário há mais de 6 meses (da última compra da base)',
+    'manter',
+    'Enviado/faturado/em separação há tanto tempo provavelmente nunca foi concluído; fica fora da receita',
+    (SELECT count(*) FROM silver.orders
+     WHERE order_status NOT IN ('delivered', 'canceled', 'unavailable')
+       AND order_purchase_timestamp
+           < (SELECT max(order_purchase_timestamp) FROM silver.orders) - INTERVAL 6 MONTH)

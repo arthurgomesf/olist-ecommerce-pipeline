@@ -78,6 +78,30 @@ def write_quality_report(
                 f"| {rule_id} | {rule} | {action} | {fmt(rows_affected)} | {reason} |"
             )
 
+    checks = con.execute(
+        """
+        SELECT check_id, description, failures
+        FROM audit.check_log
+        WHERE batch_id = ?
+        ORDER BY check_id
+        """,
+        [batch_id],
+    ).fetchall()
+    lines += [
+        "",
+        "## Checagens de integridade da gold",
+        "",
+        "Rodam a cada execução, depois da gold. Se alguma encontrar violações, o pipeline para",
+        "com erro e esta documentação não é gerada.",
+        "",
+        "| Checagem | O que é verificado | Violações |",
+        "|---|---|---:|",
+        *[
+            f"| {check_id} | {description} | {fmt(failures)} |"
+            for check_id, description, failures in checks
+        ],
+    ]
+
     path.parent.mkdir(exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     log.info("  %s atualizado", path.relative_to(path.parents[1]).as_posix())

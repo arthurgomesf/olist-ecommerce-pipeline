@@ -38,6 +38,7 @@
 | ORD-05 | Pedido entregue sem data de aprovação do pagamento | sinalizar | 14 | Não afeta o prazo (compra -> entrega); mantido e marcado |
 | ORD-06 | Coleta pela transportadora registrada antes da compra | sinalizar | 166 | Erro de registro na data de coleta; não afeta o prazo compra -> entrega |
 | ORD-07 | Entrega ao cliente registrada antes da coleta pela transportadora | sinalizar | 23 | Datas intermediárias inconsistentes; o prazo compra -> entrega continua válido |
+| ORD-08 | Pedido parado em status intermediário há mais de 6 meses (da última compra da base) | manter | 1.406 | Enviado/faturado/em separação há tanto tempo provavelmente nunca foi concluído; fica fora da receita |
 
 ### order_items
 
@@ -108,3 +109,32 @@
 | PRD-04 | Categoria ausente do arquivo oficial de tradução traduzida manualmente | corrigir | 13 | pc_gamer e portateis_cozinha_e_preparadores_de_alimentos não têm tradução oficial |
 | PRD-05 | Categoria sem nenhuma tradução (mantida em português) | sinalizar | 0 | Categoria nova sem tradução: precisa ser incluída na tradução manual |
 | PRD-06 | Peso zero convertido para nulo | corrigir | 4 | Nenhum produto pesa 0 g; é erro de cadastro, então o peso fica desconhecido |
+
+## Checagens de integridade da gold
+
+Rodam a cada execução, depois da gold. Se alguma encontrar violações, o pipeline para
+com erro e esta documentação não é gerada.
+
+| Checagem | O que é verificado | Violações |
+|---|---|---:|
+| CHK-01 | dim_date: date_day único e preenchido | 0 |
+| CHK-02 | dim_customer: customer_id único e preenchido | 0 |
+| CHK-03 | dim_seller: seller_id único e preenchido | 0 |
+| CHK-04 | dim_product: product_id único e preenchido | 0 |
+| CHK-05 | fct_orders: order_id único e preenchido | 0 |
+| CHK-06 | fct_order_items: (order_id, order_item_id) único e preenchido | 0 |
+| CHK-07 | fct_payments: (order_id, payment_sequential) único e preenchido | 0 |
+| CHK-08 | fct_orders: todo customer_id existe em dim_customer | 0 |
+| CHK-09 | fct_orders: toda data de compra existe em dim_date | 0 |
+| CHK-10 | fct_order_items: todo item pertence a um pedido de fct_orders | 0 |
+| CHK-11 | fct_order_items: todo product_id existe em dim_product | 0 |
+| CHK-12 | fct_order_items: todo seller_id existe em dim_seller | 0 |
+| CHK-13 | fct_payments: todo pagamento pertence a um pedido de fct_orders | 0 |
+| CHK-14 | fct_orders: nota da avaliação entre 1 e 5 | 0 |
+| CHK-15 | fct_orders: prazo de entrega nunca negativo | 0 |
+| CHK-16 | fct_order_items: preço maior que zero | 0 |
+| CHK-17 | fct_payments: valor pago nunca negativo | 0 |
+| CHK-18 | fct_orders tem exatamente os pedidos da silver | 0 |
+| CHK-19 | Soma dos preços: fct_order_items = silver.order_items | 0 |
+| CHK-20 | Soma dos itens por pedido: fct_orders = fct_order_items | 0 |
+| CHK-21 | Soma dos pagamentos: fct_orders = fct_payments | 0 |

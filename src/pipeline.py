@@ -4,7 +4,7 @@
 
 Roda as etapas em ordem sobre o arquivo warehouse/olist.duckdb:
 bronze (carga incremental) -> silver (limpeza) -> regras de qualidade -> gold (modelo
-estrela) -> documentação.
+estrela) -> checagens da gold (para tudo se algo falhar) -> documentação.
 """
 
 import logging
@@ -15,6 +15,7 @@ from contextlib import contextmanager
 import duckdb
 
 from src.bronze import load_bronze
+from src.checks import DataCheckError, run_checks
 from src.config import DB_PATH, GOLD_TABLES, SILVER_TABLES, WAREHOUSE_DIR
 from src.docs import write_quality_report
 from src.quality import run_quality_rules
@@ -57,6 +58,8 @@ def run() -> None:
             run_quality_rules(con, batch_id, SILVER_TABLES)
         with step("gold"):
             build_layer(con, "gold", GOLD_TABLES)
+        with step("checagens da gold"):
+            run_checks(con, batch_id)
         with step("documentação"):
             write_quality_report(con, batch_id)
 
@@ -73,7 +76,8 @@ def main() -> None:
     )
     try:
         run()
-    except FileNotFoundError as error:  # CSVs ausentes: mensagem limpa, sem traceback
+    # Erros esperados ganham mensagem limpa, sem traceback: CSVs ausentes ou dado quebrado.
+    except (FileNotFoundError, DataCheckError) as error:
         log.error("%s", error)
         sys.exit(1)
 

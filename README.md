@@ -37,7 +37,7 @@ flowchart LR
 | **raw** (`data/raw/`) | Os CSVs originais, nunca alterados | Arquivos novos são acrescentados à pasta |
 | **bronze** | Cópia fiel dos CSVs (tudo como texto) + colunas de controle | Só recebe inserções, controladas por hash |
 | **silver** | Uma tabela limpa por entidade, com tipos corretos e flags de qualidade | Recalculada a partir da bronze a cada execução |
-| **gold** | Modelo estrela pronto para análise _(em construção)_ | Recalculada a partir da silver |
+| **gold** | Modelo estrela pronto para análise, com as métricas de entrega | Recalculada a partir da silver e conferida por 21 checagens |
 | **audit** | Log de cargas e resultado das regras de qualidade | A cada execução |
 
 Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`warehouse/olist.duckdb`).
@@ -74,8 +74,9 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
    .venv\Scripts\python -m src.pipeline
    ```
 
-   O pipeline cria `warehouse/olist.duckdb`, mostra no log quantas linhas entraram em cada etapa e
-   regenera `docs/data_quality.md`. Rodar de novo **não duplica nada** (ver seção 4).
+   O pipeline cria `warehouse/olist.duckdb`, mostra no log quantas linhas entraram em cada etapa,
+   roda as checagens de integridade da gold (se alguma falhar, ele para com erro) e regenera
+   `docs/data_quality.md`. Rodar de novo **não duplica nada** (ver seção 4).
 
 4. **Rode os testes**
 
@@ -96,11 +97,14 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
 │   ├── bronze.py          # carga incremental CSV -> bronze
 │   ├── transform.py       # executa os SQL de cada camada
 │   ├── quality.py         # calcula e registra as regras de qualidade
+│   ├── checks.py          # checagens de integridade da gold (param o pipeline se falharem)
 │   ├── docs.py            # gera docs/data_quality.md
 │   └── pipeline.py        # orquestra tudo: python -m src.pipeline
 ├── sql/
 │   ├── silver/            # uma transformação por tabela (+ _functions.sql)
-│   └── quality/           # as regras de qualidade de cada tabela
+│   ├── quality/           # as regras de qualidade de cada tabela da silver
+│   ├── gold/              # dimensões e fatos do modelo estrela (+ _functions.sql)
+│   └── checks/            # as checagens de integridade da gold
 ├── docs/
 │   └── data_quality.md    # gerado automaticamente a cada execução
 ├── tests/                 # testes automatizados (pytest)
@@ -151,7 +155,100 @@ auditado desde a origem; cada camada tem uma única responsabilidade.
 - A mesma função `normalize_city()` padroniza cidades em clientes, vendedores e geolocalização,
   para que a comparação entre tabelas seja justa.
 
-### Gold _(em construção)_
+### Gold: modelo estrela
+
+```mermaid
+erDiagram
+    dim_customer ||--o{ fct_orders : "customer_id"
+    dim_date ||--o{ fct_orders : "order_purchase_date"
+    fct_orders ||--o{ fct_order_items : "order_id"
+    fct_orders ||--o{ fct_payments : "order_id"
+    dim_product ||--o{ fct_order_items : "product_id"
+    dim_seller ||--o{ fct_order_items : "seller_id"
+
+    fct_orders {
+        varchar order_id PK
+        varchar customer_id FK
+        date order_purchase_date FK
+        decimal items_value
+        decimal freight_value
+        int review_score
+        int delivery_days
+        int delay_days
+        boolean is_late
+        boolean is_completed_sale
+    }
+    fct_order_items {
+        varchar order_id PK
+        int order_item_id PK
+        varchar product_id FK
+        varchar seller_id FK
+        decimal price
+        decimal freight_value
+    }
+    fct_payments {
+        varchar order_id PK
+        int payment_sequential PK
+        varchar payment_type
+        int payment_installments
+        decimal payment_value
+    }
+    dim_customer {
+        varchar customer_id PK
+        varchar customer_unique_id
+        varchar customer_state
+        varchar customer_region
+    }
+    dim_product {
+        varchar product_id PK
+        varchar product_category_name
+        varchar product_category_name_en
+    }
+    dim_seller {
+        varchar seller_id PK
+        varchar seller_state
+        varchar seller_region
+    }
+    dim_date {
+        date date_day PK
+        varchar year_month
+        varchar day_name
+    }
+```
+
+| Tabela | Grão (1 linha por…) | Para que serve |
+|---|---|---|
+| `fct_orders` | pedido | **Tabela derivada com as métricas de entrega**, valores do pedido e nota da avaliação |
+| `fct_order_items` | item de pedido | Receita por produto, categoria e vendedor |
+| `fct_payments` | pagamento | Meios de pagamento e parcelas |
+| `dim_customer` | `customer_id` (cliente do pedido) | UF, região, cidade, coordenadas e `customer_unique_id` |
+| `dim_product` | produto | Categoria em português e em inglês, peso e medidas |
+| `dim_seller` | vendedor | UF, região, cidade e coordenadas |
+| `dim_date` | dia | Ano, mês, ano-mês e dia da semana |
+
+**Por que estrela:** as perguntas de negócio são do tipo "medida por dimensão" (receita por
+categoria, prazo por estado). Na estrela, cada pergunta sai com um ou dois joins simples, e cada
+tabela tem um grão explícito.
+
+**Por que dois fatos principais (pedido e item):** são dois grãos de negócio diferentes. Se o
+frete, o pagamento e a nota ficassem em cada item, um pedido com três itens teria a nota contada
+três vezes (_fan-out_). Por isso os valores do pedido são agregados no grão do pedido.
+
+**Por que `dim_customer` no grão `customer_id`:** o `customer_id` carrega o endereço de entrega
+daquele pedido, que é o que importa para logística por estado; a pessoa (`customer_unique_id`)
+fica como atributo, para medir recompra.
+
+Métricas de entrega do `fct_orders` (preenchidas só para pedidos entregues com data de entrega):
+
+| Métrica | Definição |
+|---|---|
+| `delivery_days` | Dias corridos entre a compra e a entrega ao cliente |
+| `estimated_days` | Dias corridos entre a compra e a data prometida |
+| `delay_days` | Entrega − data prometida, em dias (positivo = atraso; negativo = antes do prazo) |
+| `is_late` | Entregue depois do **dia** prometido |
+
+A premissa de receita fica definida em um único lugar, a função `is_completed_sale()` em
+`sql/gold/_functions.sql`, e não espalhada pelas consultas.
 
 ## 5. Regras de qualidade
 
@@ -171,18 +268,26 @@ Os casos que mais mudam o dado:
 - **Vendedores:** cidade padronizada e localização corrigida pelo CEP.
 - **Pagamentos:** pagamentos sem tipo e sem valor são removidos; parcelas zeradas viram 1.
 
+Depois da gold, **21 checagens de integridade** conferem chaves únicas, se todo fato aponta para uma
+dimensão existente, valores dentro do domínio (nota de 1 a 5, prazo nunca negativo) e se os totais
+da gold batem com os da silver. Se alguma encontrar violações, o pipeline para com erro antes de
+gerar a documentação. O resultado também fica em [`docs/data_quality.md`](docs/data_quality.md).
+
 ## 6. Premissas
 
-Já fixadas na silver:
-
+- **Receita** = soma do preço dos itens (`price`, sem frete) dos **pedidos entregues**. Pedidos
+  cancelados, indisponíveis e os que seguem "em andamento" ficam de fora (ver limitações).
+  Considerar os pedidos em andamento aumentaria a receita em cerca de 2%.
+- **A receita vem dos itens, não dos pagamentos:** o total pago inclui juros de parcelamento e
+  vouchers e difere de itens + frete em parte dos pedidos.
+- **Atraso** é comparado por **data**: a data prometida não tem hora (00:00), então comparar com o
+  horário da entrega marcaria como atrasada uma entrega feita no próprio dia prometido.
+- **Tempo de entrega** em dias corridos, da compra à entrega ao cliente.
 - **Cliente** é o `customer_unique_id`, não o `customer_id`.
-- **Receita vem dos itens** (`price`), não dos pagamentos: o total pago inclui juros de parcelamento
-  e vouchers e difere de itens + frete em parte dos pedidos.
 - **Uma avaliação por pedido:** a respondida por último.
 - **Localização do vendedor:** o CEP prevalece sobre a cidade e a UF digitadas.
 
-_As definições das métricas (receita por status do pedido, atraso, tempo de entrega) serão fixadas
-na etapa de análise (em construção)._
+_Definições específicas de cada análise ficam junto da análise, na seção 8 (em construção)._
 
 ## 7. Limitações dos dados
 
@@ -192,6 +297,9 @@ na etapa de análise (em construção)._
   dos CEPs de clientes e vendedores não existe na base de geolocalização.
 - **Prefixos de CEP que cobrem mais de uma cidade:** a "cidade do CEP" é a mais frequente no prefixo.
   Por isso um vendedor de Monte Alegre do Sul (SP) passou a constar como Jaguariúna, a cidade vizinha.
+- **Pedidos travados:** parte dos pedidos segue "enviado", "faturado" ou "em separação" há mais de
+  seis meses no fim dos dados (regra ORD-08): provavelmente nunca foram concluídos. O dataset não
+  tem histórico de status para confirmar; por isso eles ficam fora da receita.
 - **Janela de 09/2016 a 10/2018**, com meses das pontas quase vazios.
 
 _(lista em construção)_
