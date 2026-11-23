@@ -26,3 +26,15 @@ SELECT
     'Esperado: o customer_id é gerado a cada pedido. Clientes e recompra usam customer_unique_id',
     (SELECT count(*) FROM (SELECT customer_unique_id FROM silver.customers
                            GROUP BY customer_unique_id HAVING count(*) > 1))
+
+UNION ALL
+SELECT
+    'CUS-04', 'customers',
+    'Clientes cuja UF diverge da UF do CEP (verificação)',
+    'manter',
+    'A UF do cliente vem do sistema, não é digitada; se bate com o CEP, as análises por estado são confiáveis',
+    (SELECT count(*)
+     FROM silver.customers AS c
+     JOIN silver.geolocation AS g
+         ON g.geolocation_zip_code_prefix = c.customer_zip_code_prefix
+     WHERE g.geolocation_state <> c.customer_state)

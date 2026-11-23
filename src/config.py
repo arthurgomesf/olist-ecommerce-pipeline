@@ -10,6 +10,7 @@ RAW_DIR = ROOT_DIR / "data" / "raw"  # CSVs originais, nunca alterados
 WAREHOUSE_DIR = ROOT_DIR / "warehouse"
 DB_PATH = WAREHOUSE_DIR / "olist.duckdb"  # o mini Data Warehouse (um único arquivo)
 SQL_DIR = ROOT_DIR / "sql"  # transformações (silver/gold) e regras de qualidade
+DOCS_DIR = ROOT_DIR / "docs"  # documentação (parte dela gerada pelo pipeline)
 
 # Tabela da bronze -> prefixo do nome do arquivo na raw.
 # Todo arquivo "<prefixo>*.csv" é tratado como um lote dessa tabela. Assim, um arquivo

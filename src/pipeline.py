@@ -3,7 +3,7 @@
     python -m src.pipeline
 
 Roda as etapas em ordem sobre o arquivo warehouse/olist.duckdb:
-bronze (carga incremental) -> silver (limpeza) -> regras de qualidade.
+bronze (carga incremental) -> silver (limpeza) -> regras de qualidade -> documentação.
 """
 
 import logging
@@ -15,6 +15,7 @@ import duckdb
 
 from src.bronze import load_bronze
 from src.config import DB_PATH, SILVER_TABLES, WAREHOUSE_DIR
+from src.docs import write_quality_report
 from src.quality import run_quality_rules
 from src.transform import build_layer
 
@@ -53,6 +54,8 @@ def run() -> None:
             build_layer(con, "silver", SILVER_TABLES)
         with step("regras de qualidade"):
             run_quality_rules(con, batch_id, SILVER_TABLES)
+        with step("documentação"):
+            write_quality_report(con, batch_id)
 
     log.info(
         "Pipeline concluído: lote %d em %.1fs", batch_id, time.perf_counter() - start
