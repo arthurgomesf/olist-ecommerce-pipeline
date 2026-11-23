@@ -110,3 +110,30 @@ def test_pedido_com_duas_avaliacoes_fica_com_a_respondida_por_ultimo(
     assert con.execute(
         "SELECT order_id, review_id, review_score FROM silver.order_reviews"
     ).fetchall() == [("o1", "r2", 5)]
+
+
+def test_cidade_do_vendedor_e_padronizada(con, tmp_path, monkeypatch, write_csv):
+    use_only(monkeypatch, "sellers")
+    # (seller_id, cidade como veio, UF, cidade esperada na silver) - casos reais da base
+    cases = [
+        ("s1", "sao paulo / sao paulo", "SP", "sao paulo"),
+        ("s2", "lages - sc", "SC", "lages"),
+        ("s3", "andira-pr", "PR", "andira"),
+        ("s4", "mogi-guacu", "SP", "mogi-guacu"),  # hífen do nome não pode sumir
+        ("s5", "são  paulo", "SP", "sao paulo"),  # acento + espaço duplo
+        ("s6", "santa barbara d´oeste", "SP", "santa barbara d'oeste"),
+        ("s7", '"novo hamburgo, rio grande do sul, brasil"', "RS", "novo hamburgo"),
+        ("s8", "04482255", "RJ", None),  # CEP no lugar da cidade
+        ("s9", "vendas@creditparts.com.br", "PR", None),  # e-mail no lugar da cidade
+    ]
+    rows = [f"{seller_id},01000,{city},{uf}" for seller_id, city, uf, _ in cases]
+    header = "seller_id,seller_zip_code_prefix,seller_city,seller_state"
+    write_csv(tmp_path / "olist_sellers_dataset.csv", header, rows)
+    bronze.load_bronze(con, tmp_path)
+
+    build_layer(con, "silver", ["sellers"])
+
+    result = dict(
+        con.execute("SELECT seller_id, seller_city FROM silver.sellers").fetchall()
+    )
+    assert result == {seller_id: expected for seller_id, _, _, expected in cases}
