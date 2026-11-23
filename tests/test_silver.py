@@ -137,3 +137,38 @@ def test_cidade_do_vendedor_e_padronizada(con, tmp_path, monkeypatch, write_csv)
         con.execute("SELECT seller_id, seller_city FROM silver.sellers").fetchall()
     )
     assert result == {seller_id: expected for seller_id, _, _, expected in cases}
+
+
+def test_categoria_traduzida_com_fallback_manual_e_rotulo_para_nulo(
+    con, tmp_path, monkeypatch, write_csv
+):
+    use_only(monkeypatch, "products", "category_translation")
+    header = (
+        "product_id,product_category_name,product_name_lenght,product_description_lenght,"
+        "product_photos_qty,product_weight_g,product_length_cm,product_height_cm,"
+        "product_width_cm"
+    )
+    products = [
+        "p1,beleza_saude,40,287,1,225,16,10,14",  # tem tradução oficial
+        "p2,pc_gamer,40,287,1,225,16,10,14",  # só tem tradução manual
+        "p3,,,,,0,16,10,14",  # sem categoria e com peso zero
+    ]
+    write_csv(tmp_path / "olist_products_dataset.csv", header, products)
+    write_csv(
+        tmp_path / "product_category_name_translation.csv",
+        "product_category_name,product_category_name_english",
+        ["beleza_saude,health_beauty"],
+    )
+    bronze.load_bronze(con, tmp_path)
+
+    build_layer(con, "silver", ["products"])
+
+    assert con.execute("""
+        SELECT product_id, product_category_name, product_category_name_en, product_weight_g
+        FROM silver.products
+        ORDER BY product_id
+    """).fetchall() == [
+        ("p1", "beleza_saude", "health_beauty", 225),
+        ("p2", "pc_gamer", "gaming_pc", 225),
+        ("p3", "sem_categoria", "unknown", None),
+    ]

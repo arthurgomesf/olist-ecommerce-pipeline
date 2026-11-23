@@ -38,4 +38,5 @@ SILVER_TABLES = [
     "order_reviews",
     "customers",
     "sellers",
+    "products",
 ]
