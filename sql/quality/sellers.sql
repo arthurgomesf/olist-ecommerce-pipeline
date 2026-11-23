@@ -13,7 +13,7 @@ SELECT
 UNION ALL
 SELECT
     'SEL-02', 'sellers',
-    'Cidade padronizada (acento, espaços, UF e textos extras removidos)',
+    'Texto da cidade padronizado (acento, espaços, UF e textos extras removidos)',
     'corrigir',
     'A cidade é digitada livremente (ex.: "sao paulo / sao paulo", "lages - sc")',
     (SELECT count(*) FROM silver.sellers WHERE dq_city_fixed)
@@ -21,7 +21,15 @@ SELECT
 UNION ALL
 SELECT
     'SEL-03', 'sellers',
-    'Cidade inválida (números ou e-mail no lugar do nome) convertida para nulo',
+    'UF digitada diferente da UF do CEP: vale a UF do CEP',
     'corrigir',
-    'Não é nome de cidade; a UF e o CEP do vendedor continuam válidos',
-    (SELECT count(*) FROM silver.sellers WHERE dq_city_invalid)
+    'O CEP é validado e a UF é digitada; o cadastro parece vir com "SP" por padrão',
+    (SELECT count(*) FROM silver.sellers WHERE dq_state_from_zip)
+
+UNION ALL
+SELECT
+    'SEL-04', 'sellers',
+    'Cidade inexistente na base de CEPs da UF substituída pela cidade do CEP',
+    'corrigir',
+    'Erros de digitação, abreviações ("sbc"), bairros, nome do estado ou texto inválido',
+    (SELECT count(*) FROM silver.sellers WHERE dq_city_from_zip)

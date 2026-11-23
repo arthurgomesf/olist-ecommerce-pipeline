@@ -5,8 +5,8 @@
 -- medir recompra, use customer_unique_id.
 -- O que esta etapa faz:
 --   1. Deduplica: fica a versão mais recente de cada customer_id.
---   2. Padroniza: cidade em minúsculas, sem acento e sem espaços repetidos; UF em
---      maiúsculas. O CEP (prefixo de 5 dígitos) segue como texto para manter o zero à
+--   2. Padroniza: cidade com normalize_city() (minúsculas, sem acento, sem espaços
+--      repetidos — a mesma regra de vendedores e geolocalização); UF em maiúsculas. O CEP (prefixo de 5 dígitos) segue como texto para manter o zero à
 --      esquerda. Toda correção fica marcada em dq_city_fixed.
 
 CREATE OR REPLACE TABLE silver.customers AS
@@ -25,8 +25,7 @@ standardized AS (
         customer_unique_id,
         customer_zip_code_prefix,
         customer_city AS original_city,
-        regexp_replace(lower(strip_accents(trim(customer_city))), '\s+', ' ', 'g')
-            AS customer_city,
+        normalize_city(customer_city) AS customer_city,
         upper(trim(customer_state)) AS customer_state,
         _batch_id,
         _source_file

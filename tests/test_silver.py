@@ -3,6 +3,8 @@
 from datetime import datetime
 from decimal import Decimal
 
+import pytest
+
 from src import bronze
 from src.config import SOURCES
 from src.quality import run_quality_rules
@@ -19,6 +21,13 @@ DELIVERED = "o1,c1,delivered,2018-01-01 10:00:00,2018-01-01 11:00:00,2018-01-02 
 
 ITEMS_HEADER = "order_id,order_item_id,product_id,seller_id,shipping_limit_date,price,freight_value"
 ITEM = "o1,1,p1,s1,2018-01-03 10:00:00,20.00,5.00"
+
+GEO_HEADER = (
+    "geolocation_zip_code_prefix,geolocation_lat,geolocation_lng,"
+    "geolocation_city,geolocation_state"
+)
+GEO_OTHER_ZIP = "99999,-10.0,-50.0,outra cidade,TO"  # um CEP que nenhum vendedor usa
+SELLERS_HEADER = "seller_id,seller_zip_code_prefix,seller_city,seller_state"
 
 REVIEWS_HEADER = (
     "review_id,order_id,review_score,review_comment_title,review_comment_message,"
@@ -112,8 +121,38 @@ def test_pedido_com_duas_avaliacoes_fica_com_a_respondida_por_ultimo(
     ).fetchall() == [("o1", "r2", 5)]
 
 
+def test_geolocalizacao_consolida_um_cep_por_linha(
+    con, tmp_path, monkeypatch, write_csv
+):
+    use_only(monkeypatch, "geolocation")
+    points = [
+        "01001,-23.55,-46.63,são paulo,SP",
+        "01001,-23.55,-46.63,são paulo,SP",  # duplicata exata
+        "01001,-23.56,-46.64,sao paulo,SP",
+        "01001,38.27,-7.80,sao paulo,SP",  # cai em Portugal: erro de geocodificação
+        "53990,-3.85,-32.42,fernando de noronha,PE",  # ilha: precisa ficar
+    ]
+    write_csv(tmp_path / "olist_geolocation_dataset.csv", GEO_HEADER, points)
+    bronze.load_bronze(con, tmp_path)
+
+    build_layer(con, "silver", ["geolocation"])
+
+    rows = con.execute("""
+        SELECT geolocation_zip_code_prefix, geolocation_lat, geolocation_lng,
+               geolocation_city, geolocation_state, points
+        FROM silver.geolocation
+        ORDER BY 1
+    """).fetchall()
+    assert rows == [
+        ("01001", pytest.approx(-23.555), pytest.approx(-46.635), "sao paulo", "SP", 2),
+        ("53990", -3.85, -32.42, "fernando de noronha", "PE", 1),
+    ]
+
+
 def test_cidade_do_vendedor_e_padronizada(con, tmp_path, monkeypatch, write_csv):
-    use_only(monkeypatch, "sellers")
+    use_only(monkeypatch, "geolocation", "sellers")
+    # Base de CEPs sem os CEPs dos vendedores: aqui testamos só a limpeza do texto.
+    write_csv(tmp_path / "olist_geolocation_dataset.csv", GEO_HEADER, [GEO_OTHER_ZIP])
     # (seller_id, cidade como veio, UF, cidade esperada na silver) - casos reais da base
     cases = [
         ("s1", "sao paulo / sao paulo", "SP", "sao paulo"),
@@ -127,16 +166,43 @@ def test_cidade_do_vendedor_e_padronizada(con, tmp_path, monkeypatch, write_csv)
         ("s9", "vendas@creditparts.com.br", "PR", None),  # e-mail no lugar da cidade
     ]
     rows = [f"{seller_id},01000,{city},{uf}" for seller_id, city, uf, _ in cases]
-    header = "seller_id,seller_zip_code_prefix,seller_city,seller_state"
-    write_csv(tmp_path / "olist_sellers_dataset.csv", header, rows)
+    write_csv(tmp_path / "olist_sellers_dataset.csv", SELLERS_HEADER, rows)
     bronze.load_bronze(con, tmp_path)
 
-    build_layer(con, "silver", ["sellers"])
+    build_layer(con, "silver", ["geolocation", "sellers"])
 
     result = dict(
         con.execute("SELECT seller_id, seller_city FROM silver.sellers").fetchall()
     )
     assert result == {seller_id: expected for seller_id, _, _, expected in cases}
+
+
+def test_localizacao_do_vendedor_segue_o_cep(con, tmp_path, monkeypatch, write_csv):
+    use_only(monkeypatch, "geolocation", "sellers")
+    points = [
+        "31570,-19.86,-43.92,belo horizonte,MG",
+        "09726,-23.70,-46.55,são bernardo do campo,SP",
+    ]
+    write_csv(tmp_path / "olist_geolocation_dataset.csv", GEO_HEADER, points)
+    sellers = [
+        "s1,31570,belo horizonte,SP",  # UF digitada errada: o CEP é de MG
+        "s2,09726,sbc/sp,SP",  # abreviação: vira a cidade do CEP
+        "s3,09726,sao bernardo do campo,SP",  # já está certo: não muda
+    ]
+    write_csv(tmp_path / "olist_sellers_dataset.csv", SELLERS_HEADER, sellers)
+    bronze.load_bronze(con, tmp_path)
+
+    build_layer(con, "silver", ["geolocation", "sellers"])
+
+    assert con.execute("""
+        SELECT seller_id, seller_city, seller_state, dq_state_from_zip, dq_city_from_zip
+        FROM silver.sellers
+        ORDER BY seller_id
+    """).fetchall() == [
+        ("s1", "belo horizonte", "MG", True, False),
+        ("s2", "sao bernardo do campo", "SP", False, True),
+        ("s3", "sao bernardo do campo", "SP", False, False),
+    ]
 
 
 def test_categoria_traduzida_com_fallback_manual_e_rotulo_para_nulo(

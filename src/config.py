@@ -37,6 +37,7 @@ SILVER_TABLES = [
     "order_payments",
     "order_reviews",
     "customers",
+    "geolocation",  # antes de sellers: a localização do vendedor é conferida pelo CEP
     "sellers",
     "products",
 ]
