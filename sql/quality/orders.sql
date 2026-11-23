@@ -1,6 +1,7 @@
 -- Regras de qualidade de silver.orders.
 -- Cada SELECT é uma regra: o que foi feito, por quê, e quantas linhas foram afetadas.
--- Ações: remover | corrigir | sinalizar (o registro fica, marcado com uma flag dq_*).
+-- Ações: remover | corrigir | sinalizar (o registro fica, marcado com uma flag dq_*)
+--        | manter (nada muda; só registrado para transparência).
 
 SELECT
     'ORD-01' AS rule_id,
