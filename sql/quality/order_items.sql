@@ -37,7 +37,7 @@ SELECT
     'ITM-04', 'order_items',
     'Data-limite de envio mais de 1 ano após a compra',
     'sinalizar',
-    'Datas em 2020 para compras de 2017 (mediana: 6 dias); coluna não usada nas análises',
+    'No histórico a mediana é 6 dias; mais de 1 ano é erro de registro. Coluna não usada nas análises',
     (SELECT count(*) FROM silver.order_items WHERE dq_shipping_limit_too_far)
 
 UNION ALL

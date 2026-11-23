@@ -20,6 +20,11 @@ DELIVERED = "o1,c1,delivered,2018-01-01 10:00:00,2018-01-01 11:00:00,2018-01-02 
 ITEMS_HEADER = "order_id,order_item_id,product_id,seller_id,shipping_limit_date,price,freight_value"
 ITEM = "o1,1,p1,s1,2018-01-03 10:00:00,20.00,5.00"
 
+REVIEWS_HEADER = (
+    "review_id,order_id,review_score,review_comment_title,review_comment_message,"
+    "review_creation_date,review_answer_timestamp"
+)
+
 
 def use_only(monkeypatch, *tables):
     """Para o teste, o pipeline passa a conhecer só as tabelas indicadas."""
@@ -86,3 +91,22 @@ def test_preco_absurdo_vira_a_versao_atual_e_e_sinalizado(
         [batch_id],
     ).fetchone()
     assert flagged == 1
+
+
+def test_pedido_com_duas_avaliacoes_fica_com_a_respondida_por_ultimo(
+    con, tmp_path, monkeypatch, write_csv
+):
+    use_only(monkeypatch, "order_reviews")
+    # A mais recente vem primeiro no arquivo: a escolha não pode depender da posição.
+    reviews = [
+        "r2,o1,5,,Chegou tudo certo,2018-01-15 00:00:00,2018-01-16 09:00:00",
+        "r1,o1,1,,Demorou muito,2018-01-11 00:00:00,2018-01-12 10:00:00",
+    ]
+    write_csv(tmp_path / "olist_order_reviews_dataset.csv", REVIEWS_HEADER, reviews)
+    bronze.load_bronze(con, tmp_path)
+
+    build_layer(con, "silver", ["order_reviews"])
+
+    assert con.execute(
+        "SELECT order_id, review_id, review_score FROM silver.order_reviews"
+    ).fetchall() == [("o1", "r2", 5)]

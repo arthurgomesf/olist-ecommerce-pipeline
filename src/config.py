@@ -31,4 +31,4 @@ SOURCES = {
 # Tabelas da silver, na ordem de construção. Cada uma tem dois arquivos:
 #   sql/silver/<tabela>.sql   -> a transformação (limpeza, tipos, deduplicação)
 #   sql/quality/<tabela>.sql  -> as regras de qualidade e quantas linhas cada uma afetou
-SILVER_TABLES = ["orders", "order_items"]
+SILVER_TABLES = ["orders", "order_items", "order_payments", "order_reviews"]
