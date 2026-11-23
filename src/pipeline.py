@@ -2,19 +2,31 @@
 
     python -m src.pipeline
 
-Roda as etapas em ordem (por enquanto: bronze) sobre o arquivo warehouse/olist.duckdb.
+Roda as etapas em ordem sobre o arquivo warehouse/olist.duckdb:
+bronze (carga incremental) -> silver (limpeza) -> regras de qualidade.
 """
 
 import logging
 import sys
 import time
+from contextlib import contextmanager
 
 import duckdb
 
 from src.bronze import load_bronze
-from src.config import DB_PATH, WAREHOUSE_DIR
+from src.config import DB_PATH, SILVER_TABLES, WAREHOUSE_DIR
+from src.quality import run_quality_rules
+from src.transform import build_layer
 
 log = logging.getLogger("pipeline")
+
+
+@contextmanager
+def step(name: str):
+    """Mede e registra no log quanto tempo uma etapa levou."""
+    start = time.perf_counter()
+    yield
+    log.info("Etapa '%s' concluída em %.1fs", name, time.perf_counter() - start)
 
 
 def connect() -> duckdb.DuckDBPyConnection:
@@ -35,9 +47,12 @@ def run() -> None:
     """Executa todas as etapas do pipeline, registrando o tempo de cada uma."""
     start = time.perf_counter()
     with connect() as con:
-        step = time.perf_counter()
-        batch_id = load_bronze(con)
-        log.info("Bronze concluída em %.1fs", time.perf_counter() - step)
+        with step("bronze"):
+            batch_id = load_bronze(con)
+        with step("silver"):
+            build_layer(con, "silver", SILVER_TABLES)
+        with step("regras de qualidade"):
+            run_quality_rules(con, batch_id, SILVER_TABLES)
 
     log.info(
         "Pipeline concluído: lote %d em %.1fs", batch_id, time.perf_counter() - start

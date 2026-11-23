@@ -4,7 +4,6 @@ Cada teste roda num banco em memória e numa pasta raw temporária, com um CSV p
 de order_items criado pelo próprio teste. Nada toca nos dados reais nem no warehouse/.
 """
 
-import duckdb
 import pytest
 
 from src import bronze
@@ -17,23 +16,12 @@ ROWS = [
 ]
 
 
-def write_csv(path, header, rows):
-    path.write_text("\n".join([header, *rows]) + "\n", encoding="utf-8")
-
-
 def count_rows(con):
     return con.execute("SELECT count(*) FROM bronze.order_items").fetchone()[0]
 
 
 @pytest.fixture
-def con():
-    """Banco DuckDB em memória, descartado ao fim de cada teste."""
-    with duckdb.connect() as connection:
-        yield connection
-
-
-@pytest.fixture
-def raw_dir(tmp_path, monkeypatch):
+def raw_dir(tmp_path, monkeypatch, write_csv):
     """Pasta raw temporária com um único arquivo de order_items (3 linhas).
 
     Para o teste, o pipeline passa a conhecer só a tabela order_items.
@@ -54,7 +42,7 @@ def test_rodar_de_novo_nao_duplica(con, raw_dir):
     assert log == [(1, 3), (2, 0)]
 
 
-def test_arquivo_novo_insere_so_a_linha_alterada(con, raw_dir):
+def test_arquivo_novo_insere_so_a_linha_alterada(con, raw_dir, write_csv):
     bronze.load_bronze(con, raw_dir)
 
     # Lote 2: chega um arquivo novo com as mesmas 3 linhas, mas o preço do item o2
@@ -76,7 +64,7 @@ def test_arquivo_novo_insere_so_a_linha_alterada(con, raw_dir):
     ]
 
 
-def test_arquivo_com_colunas_diferentes_e_recusado(con, raw_dir):
+def test_arquivo_com_colunas_diferentes_e_recusado(con, raw_dir, write_csv):
     bronze.load_bronze(con, raw_dir)
 
     # Lote 2: o arquivo novo renomeou a coluna price -> a carga deve parar.
@@ -93,7 +81,9 @@ def test_arquivo_com_colunas_diferentes_e_recusado(con, raw_dir):
     assert "olist_order_items_dataset_lote2.csv" not in loaded_files
 
 
-def test_duplicatas_dentro_do_mesmo_arquivo_sao_mantidas(con, tmp_path, monkeypatch):
+def test_duplicatas_dentro_do_mesmo_arquivo_sao_mantidas(
+    con, tmp_path, monkeypatch, write_csv
+):
     # A bronze é cópia fiel: se o próprio arquivo repete uma linha, as duas entram.
     # Quem remove duplicatas é a camada silver (ex.: geolocalização).
     monkeypatch.setattr(bronze, "SOURCES", {"order_items": "olist_order_items_dataset"})
