@@ -1,0 +1,30 @@
+# --- Dados (a camada raw fica fora do git; ver README para obter os CSVs) ---
+data/
+warehouse/
+*.duckdb
+*.duckdb.wal
+
+# --- Documentos privados / enunciado ---
+*.docx
+_private/
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Streamlit (segredos locais) ---
+.streamlit/secrets.toml
+
+# --- Sistema / IDE ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.env

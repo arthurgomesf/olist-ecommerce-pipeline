@@ -1,0 +1,22 @@
+# Dependências do projeto (versões fixadas para reprodutibilidade).
+# Python >= 3.11 (desenvolvido em 3.12).
+
+# Data Warehouse + motor SQL
+duckdb==1.5.6
+
+# Manipulação e visualização
+pandas==3.1.1
+matplotlib==3.11.2
+seaborn==0.13.2
+plotly==7.1.0
+
+# Dashboard
+streamlit==1.67.0
+
+# Notebooks
+jupyterlab==4.6.6
+ipykernel==7.4.0
+
+# Qualidade de código e testes
+pytest==9.2.0
+ruff==0.17.6
