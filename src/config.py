@@ -42,3 +42,15 @@ SILVER_TABLES = [
     "sellers",
     "products",
 ]
+
+# Tabelas da gold (modelo estrela), na ordem de construção: dimensões antes dos fatos.
+# Cada uma é um arquivo sql/gold/<tabela>.sql.
+GOLD_TABLES = [
+    "dim_date",
+    "dim_customer",
+    "dim_seller",
+    "dim_product",
+    "fct_orders",
+    "fct_order_items",
+    "fct_payments",
+]
