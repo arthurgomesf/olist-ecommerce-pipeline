@@ -99,14 +99,21 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
 │   ├── quality.py         # calcula e registra as regras de qualidade
 │   ├── checks.py          # checagens de integridade da gold (param o pipeline se falharem)
 │   ├── docs.py            # gera docs/data_quality.md
-│   └── pipeline.py        # orquestra tudo: python -m src.pipeline
+│   ├── pipeline.py        # orquestra tudo: python -m src.pipeline
+│   ├── analysis.py        # roda as consultas das análises (usado no notebook e no dashboard)
+│   └── charts.py          # gráficos das análises, com um padrão visual único
 ├── sql/
 │   ├── silver/            # uma transformação por tabela (+ _functions.sql)
 │   ├── quality/           # as regras de qualidade de cada tabela da silver
 │   ├── gold/              # dimensões e fatos do modelo estrela (+ _functions.sql)
-│   └── checks/            # as checagens de integridade da gold
+│   ├── checks/            # as checagens de integridade da gold
+│   └── analysis/          # uma consulta por pergunta de negócio
+├── notebooks/
+│   └── analysis.ipynb     # as cinco análises: gráficos e conclusões
 ├── docs/
-│   └── data_quality.md    # gerado automaticamente a cada execução
+│   ├── data_quality.md    # gerado pelo pipeline a cada execução
+│   ├── analysis_report.md # gerado pelo notebook: perguntas, gráficos e conclusões
+│   └── figures/           # os gráficos em PNG
 ├── tests/                 # testes automatizados (pytest)
 └── requirements.txt
 ```
@@ -306,7 +313,28 @@ _(lista em construção)_
 
 ## 8. Análises
 
-_(em construção)_
+Uma pergunta por tópico, respondida a partir da gold, com gráfico e conclusão de negócio:
+
+| Tópico | Pergunta |
+|---|---|
+| Vendas | Como a receita total varia mês a mês? |
+| Logística | Qual o tempo médio de entrega, em dias, por estado? |
+| Satisfação | Pedidos atrasados têm nota média menor que os entregues no prazo? |
+| Financeiro | Qual o valor médio do frete por estado do cliente? |
+| Clientes | Qual a porcentagem de clientes que compraram mais de uma vez? |
+
+- **Leitura rápida:** [`docs/analysis_report.md`](docs/analysis_report.md), com os gráficos e as
+  conclusões.
+- **Código e tabelas:** [`notebooks/analysis.ipynb`](notebooks/analysis.ipynb). Cada pergunta tem a
+  sua consulta em `sql/analysis/`.
+
+Para regenerar os gráficos e o relatório (depois do pipeline):
+
+```powershell
+.venv\Scripts\python -m jupyter nbconvert --to notebook --execute --inplace notebooks/analysis.ipynb
+```
+
+_(resumo dos resultados em construção)_
 
 ## 9. Uso de IA
 
