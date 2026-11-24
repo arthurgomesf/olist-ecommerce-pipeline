@@ -31,3 +31,4 @@ O frete médio por pedido vai de **R$ 17,33** em SP a **R$ 48,84** em PB; no Nor
 ![Qual a porcentagem de clientes que compraram mais de uma vez?](figures/q5_recompra.png)
 
 Apenas **3,0%** dos 93.358 clientes compraram mais de uma vez (2.801 clientes); contando só compras em dias diferentes, a recompra cai para 2,2%. A base é quase toda de compradores únicos: há espaço claro para retenção (CRM, cupom de segunda compra), começando pela experiência de entrega, que pesa na satisfação (pergunta 3). _Com `customer_id` no lugar de `customer_unique_id`, a recompra daria 0%, porque esse identificador muda a cada pedido._
+

@@ -103,5 +103,5 @@ def write_quality_report(
     ]
 
     path.parent.mkdir(exist_ok=True)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     log.info("  %s atualizado", path.relative_to(path.parents[1]).as_posix())

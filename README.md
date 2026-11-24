@@ -64,6 +64,10 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
    .venv/bin/python -m pip install -r requirements.txt
    ```
 
+   > No Windows, se o `pip` falhar com `OSError` e uma dica sobre _Long Path support_, o caminho
+   > da pasta ficou longo demais para alguns pacotes do Jupyter: clone numa pasta de caminho curto
+   > (ex.: `C:\projetos`) ou [habilite caminhos longos](https://pip.pypa.io/warnings/enable-long-paths).
+
 2. **Baixe os dados** do [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
    (botão _Download_; o Kaggle pode pedir login) e extraia os **9 arquivos `.csv`** em `data/raw/`.
    Os dados não ficam no repositório (licença CC BY-NC-SA 4.0 e ~126 MB).
