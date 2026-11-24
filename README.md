@@ -84,6 +84,14 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
    .venv\Scripts\python -m pytest
    ```
 
+5. **Abra o dashboard** (o navegador abre em `http://localhost:8501`; para encerrar, `Ctrl+C`):
+
+   ```powershell
+   .venv\Scripts\python -m streamlit run app/dashboard.py
+   ```
+
+   Na primeira execução o Streamlit pode pedir um e-mail no terminal: é opcional, basta apertar Enter.
+
 > Se o arquivo `warehouse/olist.duckdb` estiver aberto em outro programa (notebook, dashboard),
 > o pipeline avisa e para: o DuckDB permite um único processo escrevendo no arquivo.
 
@@ -110,6 +118,8 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
 │   └── analysis/          # uma consulta por pergunta de negócio
 ├── notebooks/
 │   └── analysis.ipynb     # as cinco análises: gráficos e conclusões
+├── app/
+│   └── dashboard.py       # dashboard interativo (Streamlit) com as mesmas consultas
 ├── docs/
 │   ├── data_quality.md    # gerado pelo pipeline a cada execução
 │   ├── analysis_report.md # gerado pelo notebook: perguntas, gráficos e conclusões
@@ -327,6 +337,9 @@ Uma pergunta por tópico, respondida a partir da gold, com gráfico e conclusão
   conclusões.
 - **Código e tabelas:** [`notebooks/analysis.ipynb`](notebooks/analysis.ipynb). Cada pergunta tem a
   sua consulta em `sql/analysis/`.
+- **Interativo:** o dashboard em `app/dashboard.py` (seção 2, passo 5) traz os indicadores
+  principais e uma aba por pergunta, com filtros de período e região. Ele usa as mesmas consultas do
+  notebook, então os números são idênticos.
 
 Para regenerar os gráficos e o relatório (depois do pipeline):
 
