@@ -5,8 +5,6 @@ confiável para o negócio: os CSVs brutos passam pelas camadas **bronze → sil
 mini Data Warehouse em **DuckDB** e alimentam análises em notebook, um relatório em Markdown e um
 dashboard em Streamlit.
 
-> 🚧 Em construção: as seções marcadas como _(em construção)_ serão concluídas nas próximas etapas.
-
 ## Sumário
 
 1. [Visão geral e arquitetura](#1-visão-geral-e-arquitetura)
@@ -18,6 +16,7 @@ dashboard em Streamlit.
 7. [Limitações dos dados](#7-limitações-dos-dados)
 8. [Análises](#8-análises)
 9. [Uso de IA](#9-uso-de-ia)
+10. [Próximos passos](#10-próximos-passos)
 
 ## 1. Visão geral e arquitetura
 
@@ -308,7 +307,8 @@ gerar a documentação. O resultado também fica em [`docs/data_quality.md`](doc
 - **Uma avaliação por pedido:** a respondida por último.
 - **Localização do vendedor:** o CEP prevalece sobre a cidade e a UF digitadas.
 
-_Definições específicas de cada análise ficam junto da análise, na seção 8 (em construção)._
+As definições específicas de cada análise (ex.: frete médio **por pedido**, recompra) ficam junto
+da própria análise, no notebook e no relatório.
 
 ## 7. Limitações dos dados
 
@@ -321,9 +321,16 @@ _Definições específicas de cada análise ficam junto da análise, na seção 
 - **Pedidos travados:** parte dos pedidos segue "enviado", "faturado" ou "em separação" há mais de
   seis meses no fim dos dados (regra ORD-08): provavelmente nunca foram concluídos. O dataset não
   tem histórico de status para confirmar; por isso eles ficam fora da receita.
-- **Janela de 09/2016 a 10/2018**, com meses das pontas quase vazios.
-
-_(lista em construção)_
+- **Janela de 09/2016 a 10/2018**, com meses das pontas quase vazios; a série mensal usa de jan/2017
+  a ago/2018. Os valores são nominais (sem correção pela inflação).
+- **Amostra pública:** cerca de 100 mil pedidos, não o universo da Olist.
+- **Status é uma foto do momento da extração:** não há histórico de mudanças de status.
+- **Avaliação é opcional:** parte dos pedidos não tem avaliação (regra REV-06), o que pode enviesar
+  as notas para quem teve uma experiência marcante.
+- **Pagamentos não reconciliam 100% com itens + frete** (regra PAY-06): juros de parcelamento e
+  vouchers não vêm separados.
+- **Estados com poucos pedidos** (RR, AP, AM e AC, com menos de 150 cada) têm médias mais instáveis.
+- **`customer_unique_id` é a melhor aproximação de "pessoa"** que o dataset oferece.
 
 ## 8. Análises
 
@@ -351,8 +358,39 @@ Para regenerar os gráficos e o relatório (depois do pipeline):
 .venv\Scripts\python -m jupyter nbconvert --to notebook --execute --inplace notebooks/analysis.ipynb
 ```
 
-_(resumo dos resultados em construção)_
+**Resumo dos resultados** (detalhes, gráficos e ressalvas no relatório):
+
+| Tópico | Resposta |
+|---|---|
+| Vendas | A receita de jan–ago/2018 foi **141% maior** que a do mesmo período de 2017; o pico foi em nov/2017, mês da Black Friday, e 2018 ficou num platô. |
+| Logística | Média de **12,5 dias**, mas de 17,6 a 29,3 dias no Norte contra 8,7 em SP. O Norte atrasa pouco porque o prazo prometido já embute a distância. |
+| Satisfação | Sim: nota **4,29** no prazo contra **2,27** nos atrasados; só 1 a 3 dias de atraso já derrubam a média para 3,29. |
+| Financeiro | De **R$ 17,33** por pedido em SP a **R$ 48,84** na PB; no Norte, até R$ 48,34 (RR), o equivalente a 28% do valor dos produtos. |
+| Clientes | Só **3,0%** dos clientes compraram mais de uma vez (2,2% em dias diferentes). |
+
+**A história que os dados contam:** a receita cresceu rápido, mas a experiência de entrega é
+desigual entre as regiões, o atraso derruba a satisfação e quase ninguém volta a comprar.
+
+**Tópico de maior afinidade:** _(a ser escrito pelo autor)_
 
 ## 9. Uso de IA
 
 _(a ser escrito pelo autor)_
+
+## 10. Próximos passos
+
+Como o projeto evoluiria para produção:
+
+- **Orquestração:** agendar o pipeline (ex.: Airflow ou Dagster), com alerta quando uma checagem da
+  gold falhar.
+- **Incremental de ponta a ponta:** hoje a bronze é incremental e a silver e a gold são recalculadas;
+  com volume grande, a silver passaria a receber só os lotes novos via `MERGE`.
+- **Histórico nas dimensões (SCD tipo 2):** guardar mudanças de endereço, categoria e status ao longo
+  do tempo, o que também resolveria a limitação dos pedidos travados.
+- **dbt:** migrar as transformações e as checagens para modelos e testes do dbt, ganhando
+  documentação e linhagem automáticas.
+- **Armazenamento:** raw e bronze em Parquet particionado num object storage, com o DuckDB (ou um
+  warehouse em nuvem) lendo direto de lá.
+- **CI:** GitHub Actions rodando `ruff` e `pytest` a cada push, com uma amostra pequena dos dados.
+- **Monitoramento da qualidade:** o `audit.quality_log` já guarda as contagens por lote; o próximo
+  passo é alertar quando uma regra variar bruscamente de um lote para o outro.
