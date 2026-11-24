@@ -6,8 +6,9 @@
 -- O que esta etapa faz:
 --   1. Deduplica: fica a versão mais recente de cada customer_id.
 --   2. Padroniza: cidade com normalize_city() (minúsculas, sem acento, sem espaços
---      repetidos — a mesma regra de vendedores e geolocalização); UF em maiúsculas. O CEP (prefixo de 5 dígitos) segue como texto para manter o zero à
---      esquerda. Toda correção fica marcada em dq_city_fixed.
+--      repetidos, a mesma regra de vendedores e geolocalização); UF em maiúsculas.
+--      O CEP (prefixo de 5 dígitos) segue como texto para manter o zero à esquerda.
+--      Toda correção fica marcada em dq_city_fixed.
 
 CREATE OR REPLACE TABLE silver.customers AS
 WITH latest_version AS (
@@ -15,7 +16,7 @@ WITH latest_version AS (
     FROM bronze.customers
     QUALIFY row_number() OVER (
         PARTITION BY customer_id
-        ORDER BY _batch_id DESC, _source_file DESC
+        ORDER BY _batch_id DESC, _source_file DESC, _row_hash
     ) = 1
 ),
 

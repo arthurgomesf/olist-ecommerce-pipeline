@@ -85,7 +85,7 @@
 
 | Regra | O que foi feito | Ação | Linhas afetadas | Por quê |
 |---|---|---|---:|---|
-| GEO-01 | Pontos duplicados exatos removidos | remover | 261.831 | O mesmo ponto repetido não traz informação e distorceria a consolidação |
+| GEO-01 | Pontos duplicados removidos (iguais depois de padronizar a cidade) | remover | 279.667 | O mesmo ponto repetido não traz informação e distorceria a consolidação |
 | GEO-02 | Pontos fora do território brasileiro (ou sem coordenada válida) descartados | remover | 27 | Erros de geocodificação (ex.: coordenadas no México ou em Portugal) puxariam a média do CEP |
 | GEO-03 | Cidade padronizada (minúsculas, sem acento, sem espaços repetidos) | corrigir | 63.443 | A mesma cidade aparecia com e sem acento (ex.: "são paulo" e "sao paulo") |
 | GEO-04 | CEPs de clientes ou vendedores ausentes da base de geolocalização | manter | 163 | Ficam sem coordenadas; cidade e UF continuam vindo do próprio cadastro |
@@ -132,7 +132,7 @@ com erro e esta documentação não é gerada.
 | CHK-13 | fct_payments: todo pagamento pertence a um pedido de fct_orders | 0 |
 | CHK-14 | fct_orders: nota da avaliação entre 1 e 5 | 0 |
 | CHK-15 | fct_orders: prazo de entrega nunca negativo | 0 |
-| CHK-16 | fct_order_items: preço maior que zero | 0 |
+| CHK-16 | fct_order_items: frete nunca negativo | 0 |
 | CHK-17 | fct_payments: valor pago nunca negativo | 0 |
 | CHK-18 | fct_orders tem exatamente os pedidos da silver | 0 |
 | CHK-19 | Soma dos preços: fct_order_items = silver.order_items | 0 |

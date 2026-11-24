@@ -13,9 +13,11 @@ WITH latest_version AS (
     FROM bronze.orders
     -- Mais recente = maior lote; dentro do mesmo lote, o arquivo que vem depois na
     -- ordem alfabética (ex.: olist_orders_dataset_2018-11.csv depois do original).
+    -- O _row_hash só desempata, de forma determinística, a mesma chave repetida no
+    -- mesmo arquivo (as demais tabelas da silver seguem a mesma regra).
     QUALIFY row_number() OVER (
         PARTITION BY order_id
-        ORDER BY _batch_id DESC, _source_file DESC
+        ORDER BY _batch_id DESC, _source_file DESC, _row_hash
     ) = 1
 ),
 

@@ -15,7 +15,7 @@ WITH latest_version AS (
     FROM bronze.order_payments
     QUALIFY row_number() OVER (
         PARTITION BY order_id, payment_sequential
-        ORDER BY _batch_id DESC, _source_file DESC
+        ORDER BY _batch_id DESC, _source_file DESC, _row_hash
     ) = 1
 ),
 

@@ -14,6 +14,7 @@ WITH classified AS (
         END AS delay_bucket
     FROM gold.fct_orders
     WHERE is_delivered
+      AND delay_days IS NOT NULL  -- sem data prometida não há como medir o atraso
       AND review_score IS NOT NULL
 )
 

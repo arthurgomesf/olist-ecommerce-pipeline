@@ -5,6 +5,19 @@ confiável para o negócio: os CSVs brutos passam pelas camadas **bronze → sil
 mini Data Warehouse em **DuckDB** e alimentam análises em notebook, um relatório em Markdown e um
 dashboard em Streamlit.
 
+**Destaques**
+
+- **Carga incremental por hash:** rodar o pipeline de novo não duplica nada, e um arquivo novo
+  acrescenta só as linhas novas ou alteradas.
+- **43 regras de qualidade documentadas**, com o que foi removido, corrigido ou sinalizado, o motivo
+  e quantas linhas cada uma afetou, em um relatório gerado a cada execução (nenhum número digitado
+  à mão).
+- **21 checagens de integridade** na gold, que param o pipeline se algo quebrar.
+- **Reprodutível:** clonado do zero e executado seguindo este README, o projeto gera relatórios e
+  gráficos idênticos aos versionados.
+- **Cinco análises**, cada uma com gráfico e conclusão de negócio, em notebook, relatório em
+  Markdown e dashboard interativo.
+
 ## Sumário
 
 1. [Visão geral e arquitetura](#1-visão-geral-e-arquitetura)
@@ -51,7 +64,7 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
    # Windows (PowerShell)
    git clone https://github.com/arthurgomesf/olist-ecommerce-pipeline.git
    cd olist-ecommerce-pipeline
-   py -3.12 -m venv .venv
+   py -3.12 -m venv .venv          # ou outra versão 3.11+, ex.: py -3.11
    .venv\Scripts\python -m pip install -r requirements.txt
    ```
 
@@ -69,7 +82,12 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
 
 2. **Baixe os dados** do [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
    (botão _Download_; o Kaggle pode pedir login) e extraia os **9 arquivos `.csv`** em `data/raw/`.
-   Os dados não ficam no repositório (licença CC BY-NC-SA 4.0 e ~126 MB).
+   A pasta não vem no clone, porque os dados não ficam no repositório (licença CC BY-NC-SA 4.0 e
+   ~126 MB); crie-a antes:
+
+   ```powershell
+   New-Item -ItemType Directory -Force data\raw   # Linux / macOS: mkdir -p data/raw
+   ```
 
 3. **Rode o pipeline** (no Linux/macOS, troque `.venv\Scripts\python` por `.venv/bin/python`):
 
@@ -133,8 +151,7 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
 
 ## 4. Decisões de modelagem
 
-**Por que DuckDB:** é um banco analítico (colunar) que roda dentro do Python, sem servidor: o
-avaliador reproduz tudo com `pip install`. Lê CSV nativamente e tem SQL completo.
+**Por que DuckDB:** é um banco analítico (colunar) que roda dentro do Python, sem servidor: o usuário reproduz tudo com `pip install`. Lê CSV nativamente e tem SQL completo.
 
 **Por que camadas:** a raw nunca é alterada, então qualquer resultado pode ser reconstruído e
 auditado desde a origem; cada camada tem uma única responsabilidade.
@@ -279,8 +296,9 @@ o resultado em `audit.quality_log` e gera a lista completa, com as contagens, em
 
 Os casos que mais mudam o dado:
 
-- **Geolocalização:** 26% das linhas eram duplicatas exatas; pontos com coordenadas fora do Brasil
-  (erros de geocodificação) são descartados, preservando Fernando de Noronha.
+- **Geolocalização:** 28% das linhas eram pontos repetidos (iguais depois de padronizar a cidade);
+  pontos com coordenadas fora do Brasil (erros de geocodificação) são descartados, preservando
+  Fernando de Noronha.
 - **Avaliações:** pedidos com mais de uma avaliação ficam com a mais recente.
 - **Produtos:** categoria traduzida para inglês, com tradução manual para as duas categorias que
   faltam no arquivo oficial; produtos sem categoria recebem o rótulo `unknown`, para que a receita
@@ -306,6 +324,8 @@ gerar a documentação. O resultado também fica em [`docs/data_quality.md`](doc
 - **Cliente** é o `customer_unique_id`, não o `customer_id`.
 - **Uma avaliação por pedido:** a respondida por último.
 - **Localização do vendedor:** o CEP prevalece sobre a cidade e a UF digitadas.
+- **Série mensal de receita:** de jan/2017 a ago/2018, período fixado na consulta da análise
+  (`sql/analysis/q1_monthly_revenue.sql`); com meses novos de dados, basta ajustá-lo ali.
 
 As definições específicas de cada análise (ex.: frete médio **por pedido**, recompra) ficam junto
 da própria análise, no notebook e no relatório.
@@ -331,6 +351,10 @@ da própria análise, no notebook e no relatório.
   vouchers não vêm separados.
 - **Estados com poucos pedidos** (RR, AP, AM e AC, com menos de 150 cada) têm médias mais instáveis.
 - **`customer_unique_id` é a melhor aproximação de "pessoa"** que o dataset oferece.
+- **Limites da carga incremental por conteúdo:** a bronze só recebe linhas com hash inédito. Se um
+  registro voltar a um estado anterior (A → B → A), a volta não é detectada; e linhas apagadas na
+  origem não são removidas, porque arquivos que só acrescentam dados não informam remoções. Em
+  produção, isso pede uma data de atualização na própria fonte ou captura de mudanças (CDC).
 
 ## 8. Análises
 
@@ -363,7 +387,7 @@ Para regenerar os gráficos e o relatório (depois do pipeline):
 | Tópico | Resposta |
 |---|---|
 | Vendas | A receita de jan–ago/2018 foi **141% maior** que a do mesmo período de 2017; o pico foi em nov/2017, mês da Black Friday, e 2018 ficou num platô. |
-| Logística | Média de **12,5 dias**, mas de 17,6 a 29,3 dias no Norte contra 8,7 em SP. O Norte atrasa pouco porque o prazo prometido já embute a distância. |
+| Logística | Média de **12,5 dias**, mas de 17,6 a 29,3 dias no Norte contra 8,7 em SP. Mesmo com a maior folga no prazo prometido, o Norte atrasa **8,6%** dos pedidos (Brasil: 6,8%); o Nordeste é o que mais atrasa (12,7%). |
 | Satisfação | Sim: nota **4,29** no prazo contra **2,27** nos atrasados; só 1 a 3 dias de atraso já derrubam a média para 3,29. |
 | Financeiro | De **R$ 17,33** por pedido em SP a **R$ 48,84** na PB; no Norte, até R$ 48,34 (RR), o equivalente a 28% do valor dos produtos. |
 | Clientes | Só **3,0%** dos clientes compraram mais de uma vez (2,2% em dias diferentes). |
@@ -371,11 +395,41 @@ Para regenerar os gráficos e o relatório (depois do pipeline):
 **A história que os dados contam:** a receita cresceu rápido, mas a experiência de entrega é
 desigual entre as regiões, o atraso derruba a satisfação e quase ninguém volta a comprar.
 
-**Tópico de maior afinidade:** _(a ser escrito pelo autor)_
+**Tópico de maior afinidade: Logística.** Foi onde os dados mais me surpreenderam: o Norte demora
+até 3,4 vezes mais que SP para receber os pedidos e, mesmo tendo a maior folga no prazo prometido,
+ainda atrasa acima da média do país. A logística acabou ligando as outras análises: o atraso
+derruba a nota (satisfação), e o frete é mais caro justamente onde a entrega demora mais
+(financeiro).
 
 ## 9. Uso de IA
 
-_(a ser escrito pelo autor)_
+Usei o **Claude Code**, assistente de programação da Anthropic, durante todo o projeto, como um par
+de programação. O processo foi assim:
+
+- **Planejamento:** antes de qualquer código, montei com a IA um roteiro em fases (ambiente, bronze,
+  silver, gold, qualidade, análises, dashboard e documentação), com cada tecnologia e o motivo de
+  usá-la. Também usei a IA para pesquisar projetos públicos feitos com o dataset da Olist e mapear
+  os erros mais comuns neles, como medir recompra com o `customer_id`, para não repeti-los.
+- **Implementação em passos pequenos:** a IA escreveu a maior parte do código, um incremento por
+  vez (uma tabela, um conjunto de regras, um teste). Em cada passo ela explicava o que tinha feito
+  e por quê e mostrava o resultado (contagens, testes, gráficos); eu revisava e aprovava antes do
+  commit. Os commits estão marcados como coautoria com a IA.
+- **Decisões que foram minhas:** manter a estrutura do repositório enxuta, só com o que eu sei
+  explicar; implementar a carga incremental por hash na bronze; contar como receita só os pedidos
+  entregues, depois de ver que a maioria dos pedidos "em andamento" estava parada havia mais de
+  seis meses; responder a recompra com 3,0%, citando os 2,2% em dias diferentes; e escolher as cinco
+  perguntas.
+- **Como validei o que a IA produziu:** nada foi aceito sem evidência. As contagens das regras
+  foram conferidas contra um perfil inicial dos dados; os testes foram "sabotados" de propósito
+  para provar que falham quando a regra quebra; a gold é conferida por 21 checagens; e, no fim, o
+  repositório foi clonado do zero e executado seguindo este README, reproduzindo os mesmos
+  relatórios e gráficos.
+- **Onde a ajuda fez mais diferença:** em detalhes fáceis de passar despercebidos, como a
+  diferença entre comparar a entrega por data ou por horário (6,77% contra 8,11% de atraso) e o
+  erro de arredondamento do ponto flutuante em valores monetários, que levou ao uso de `DECIMAL`.
+- **Revisão final:** antes da entrega, pedi uma revisão independente do repositório, também feita
+  com IA. Ela encontrou, entre outros pontos, uma conclusão de logística apoiada num estado com
+  poucos pedidos; corrigi usando os números por região.
 
 ## 10. Próximos passos
 

@@ -66,8 +66,9 @@ UNION ALL
 SELECT 'CHK-15', 'fct_orders: prazo de entrega nunca negativo',
     (SELECT count(*) FROM gold.fct_orders WHERE delivery_days < 0)
 UNION ALL
-SELECT 'CHK-16', 'fct_order_items: preço maior que zero',
-    (SELECT count(*) FROM gold.fct_order_items WHERE NOT coalesce(price > 0, false))
+-- (Preço fora da faixa não para o pipeline: a regra ITM-03 da silver sinaliza e mantém.)
+SELECT 'CHK-16', 'fct_order_items: frete nunca negativo',
+    (SELECT count(*) FROM gold.fct_order_items WHERE freight_value < 0)
 UNION ALL
 SELECT 'CHK-17', 'fct_payments: valor pago nunca negativo',
     (SELECT count(*) FROM gold.fct_payments WHERE payment_value < 0)

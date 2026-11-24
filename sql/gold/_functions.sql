@@ -2,8 +2,8 @@
 
 -- Premissa de receita, definida em UM lugar só: venda concluída = pedido entregue.
 -- Os pedidos "em andamento" (enviado, faturado, em separação...) ficam de fora: a maioria
--- está parada há mais de um ano no recorte dos dados, ou seja, provavelmente nunca foi
--- concluída. Cancelados e indisponíveis também não contam.
+-- está parada há mais de seis meses no fim dos dados (regra ORD-08), ou seja, provavelmente
+-- nunca foi concluída. Cancelados e indisponíveis também não contam.
 CREATE OR REPLACE MACRO is_completed_sale(order_status) AS
     order_status = 'delivered';
 

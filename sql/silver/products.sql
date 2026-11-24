@@ -17,7 +17,7 @@ WITH latest_version AS (
     FROM bronze.products
     QUALIFY row_number() OVER (
         PARTITION BY product_id
-        ORDER BY _batch_id DESC, _source_file DESC
+        ORDER BY _batch_id DESC, _source_file DESC, _row_hash
     ) = 1
 ),
 
@@ -26,7 +26,7 @@ official_translation AS (
     FROM bronze.category_translation
     QUALIFY row_number() OVER (
         PARTITION BY product_category_name
-        ORDER BY _batch_id DESC, _source_file DESC
+        ORDER BY _batch_id DESC, _source_file DESC, _row_hash
     ) = 1
 ),
 

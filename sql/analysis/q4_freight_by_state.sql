@@ -1,5 +1,6 @@
 -- Q4 (Financeiro): qual o valor médio do frete por estado do cliente?
--- Frete por PEDIDO (soma do frete dos itens), em pedidos entregues: é o valor que o cliente
+-- Frete por PEDIDO (soma do frete dos itens), em pedidos entregues (o mesmo filtro da Q2,
+-- para o número de pedidos por UF bater entre as duas análises): é o valor que o cliente
 -- paga na compra. A média por item subestimaria os pedidos com vários itens.
 -- O peso do frete compara o frete total com o valor total dos itens do estado.
 
@@ -11,6 +12,6 @@ SELECT
     sum(o.freight_value) / sum(o.items_value)     AS freight_share_of_items
 FROM gold.fct_orders AS o
 JOIN gold.dim_customer AS c USING (customer_id)
-WHERE o.is_completed_sale
+WHERE o.is_delivered
 GROUP BY c.customer_state, c.customer_region
 ORDER BY avg_freight DESC;

@@ -13,7 +13,7 @@ WITH latest_version AS (
     FROM bronze.order_reviews
     QUALIFY row_number() OVER (
         PARTITION BY review_id, order_id
-        ORDER BY _batch_id DESC, _source_file DESC
+        ORDER BY _batch_id DESC, _source_file DESC, _row_hash
     ) = 1
 ),
 

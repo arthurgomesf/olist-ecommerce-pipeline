@@ -152,8 +152,11 @@ with sales_tab:
     )
     fig.update_yaxes(title="R$", rangemode="tozero")
     st.plotly_chart(layout(fig, height=420), width="stretch")
+    peak = period.loc[period["revenue"].idxmax()]
+    black_friday = ", mês da Black Friday" if peak["month"] == 11 else ""
     st.caption(
-        "Pico em nov/2017, mês da Black Friday. Meses das pontas do dataset ficam de fora."
+        f"Pico do período em {peak['label']}{black_friday}. "
+        "Os meses das pontas do dataset, com poucos pedidos, ficam de fora."
     )
     with st.expander("Ver tabela"):
         st.dataframe(period.drop(columns="label"), hide_index=True)
@@ -177,9 +180,14 @@ with logistics_tab:
             state_chart(view, "avg_delivery_days", hover, marker="avg_promised_days"),
             width="stretch",
         )
+        q2["late_orders"] = q2["late_share"] * q2["orders"]
+        by_region = q2.groupby("region")[["late_orders", "orders"]].sum()
+        late_by_region = by_region["late_orders"] / by_region["orders"]
+        national = q2["late_orders"].sum() / q2["orders"].sum()
         small = q2.loc[q2["orders"] < 150, "state"].tolist()
         st.caption(
-            "Demorar não é atrasar: no Norte o prazo prometido já embute a distância. "
+            f"Pedidos atrasados: Norte {br(late_by_region['Norte'] * 100, 1)}%, "
+            f"Nordeste {br(late_by_region['Nordeste'] * 100, 1)}%, Brasil {br(national * 100, 1)}%. "
             f"Poucos pedidos (menos de 150) em: {', '.join(small)}."
         )
         with st.expander("Ver tabela"):
