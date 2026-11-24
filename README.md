@@ -294,6 +294,15 @@ Cada tabela da silver tem um arquivo em `sql/quality/` com as suas regras: o que
 o resultado em `audit.quality_log` e gera a lista completa, com as contagens, em
 [`docs/data_quality.md`](docs/data_quality.md). Os números nunca são digitados à mão.
 
+Onde cada tratamento de limpeza aparece nas regras (as contagens estão no relatório):
+
+| Tratamento | Como foi feito | Regras |
+|---|---|---|
+| **Nulos** | Valor vazio vira nulo explícito (comentário só com espaços, peso zero); produto sem categoria recebe `unknown`, para a receita não sumir das análises; pedido entregue sem data de entrega ou de aprovação é sinalizado; avaliação e comentário ausentes são mantidos, porque são opcionais | REV-04, PRD-06, PRD-03, ORD-03, ORD-05, REV-05, REV-06 |
+| **Duplicidades** | Fica só a versão mais recente de cada registro; uma avaliação por pedido; pontos repetidos da geolocalização são removidos | `*-01` de cada tabela, REV-03, GEO-01 |
+| **Tipos** | Tudo chega como texto na bronze; a silver converte datas e números com `try_cast` (o que não converter vira nulo e é contado) e guarda valores monetários em `DECIMAL(12,2)` | ORD-02, ITM-02, PAY-02, REV-02, PRD-02 |
+| **Tradução das categorias** | Arquivo oficial de tradução, mais tradução manual das duas categorias que faltam nele; categoria nova sem tradução é sinalizada | PRD-04, PRD-05 |
+
 Os casos que mais mudam o dado:
 
 - **Geolocalização:** 28% das linhas eram pontos repetidos (iguais depois de padronizar a cidade);
@@ -400,6 +409,10 @@ até 3,4 vezes mais que SP para receber os pedidos e, mesmo tendo a maior folga 
 ainda atrasa acima da média do país. A logística acabou ligando as outras análises: o atraso
 derruba a nota (satisfação), e o frete é mais caro justamente onde a entrega demora mais
 (financeiro).
+
+![Tempo médio de entrega por estado do cliente: no Norte, a entrega leva até 3,4 vezes o prazo de SP](docs/figures/q2_prazo_por_estado.png)
+
+_Os gráficos das outras quatro análises estão no [relatório](docs/analysis_report.md)._
 
 ## 9. Uso de IA
 
