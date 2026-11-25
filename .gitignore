@@ -1,5 +1,4 @@
-# --- Dados (a camada raw fica fora do git; ver README para obter os CSVs) ---
-data/
+# --- Data Warehouse (gerado pelo pipeline; os CSVs de data/raw são versionados) ---
 warehouse/
 *.duckdb
 *.duckdb.wal

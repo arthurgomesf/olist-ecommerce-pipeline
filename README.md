@@ -13,8 +13,8 @@ dashboard em Streamlit.
   e quantas linhas cada uma afetou, em um relatório gerado a cada execução (nenhum número digitado
   à mão).
 - **21 checagens de integridade** na gold, que param o pipeline se algo quebrar.
-- **Reprodutível:** clonado do zero e executado seguindo este README, o projeto gera relatórios e
-  gráficos idênticos aos versionados.
+- **Pronto para rodar:** os dados já vêm no repositório; clonado do zero e executado com os
+  comandos da seção 2, o projeto gera relatórios e gráficos idênticos aos versionados.
 - **Cinco análises**, cada uma com gráfico e conclusão de negócio, em notebook, relatório em
   Markdown e dashboard interativo.
 
@@ -56,70 +56,64 @@ Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`ware
 
 ## 2. Como executar do zero
 
-**Pré-requisitos:** Python 3.11 ou superior (desenvolvido em 3.12) e Git.
+**Pré-requisitos:** Python 3.11 ou superior (desenvolvido em 3.12) e Git. Os dados já vêm no
+repositório (fonte e licença no fim desta seção).
 
-1. **Clone o repositório e crie o ambiente virtual**
+Todos os comandos, para copiar e colar de uma vez:
 
-   ```powershell
-   # Windows (PowerShell)
-   git clone https://github.com/arthurgomesf/olist-ecommerce-pipeline.git
-   cd olist-ecommerce-pipeline
-   py -3.12 -m venv .venv          # ou outra versão 3.11+, ex.: py -3.11
-   .venv\Scripts\python -m pip install -r requirements.txt
-   ```
+```powershell
+# Windows (PowerShell)
+git clone https://github.com/arthurgomesf/olist-ecommerce-pipeline.git
+cd olist-ecommerce-pipeline
+py -3.12 -m venv .venv                     # ou outra versão 3.11+, ex.: py -3.11
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m src.pipeline
+.venv\Scripts\python -m pytest
+.venv\Scripts\python -m streamlit run app/dashboard.py
+```
 
-   ```bash
-   # Linux / macOS
-   git clone https://github.com/arthurgomesf/olist-ecommerce-pipeline.git
-   cd olist-ecommerce-pipeline
-   python3 -m venv .venv
-   .venv/bin/python -m pip install -r requirements.txt
-   ```
+```bash
+# Linux / macOS
+git clone https://github.com/arthurgomesf/olist-ecommerce-pipeline.git
+cd olist-ecommerce-pipeline
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m src.pipeline
+.venv/bin/python -m pytest
+.venv/bin/python -m streamlit run app/dashboard.py
+```
 
-   > No Windows, se o `pip` falhar com `OSError` e uma dica sobre _Long Path support_, o caminho
-   > da pasta ficou longo demais para alguns pacotes do Jupyter: clone numa pasta de caminho curto
-   > (ex.: `C:\projetos`) ou [habilite caminhos longos](https://pip.pypa.io/warnings/enable-long-paths).
+O que cada comando faz:
 
-2. **Baixe os dados** do [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
-   (botão _Download_; o Kaggle pode pedir login) e extraia os **9 arquivos `.csv`** em `data/raw/`.
-   A pasta não vem no clone, porque os dados não ficam no repositório (licença CC BY-NC-SA 4.0 e
-   ~126 MB); crie-a antes:
+1. **Ambiente virtual e dependências:** isolam as bibliotecas do projeto, com as versões fixadas
+   em `requirements.txt`.
+2. **Pipeline (`src.pipeline`):** cria `warehouse/olist.duckdb`, mostra no log quantas linhas
+   entraram em cada etapa, roda as checagens de integridade da gold (se alguma falhar, ele para com
+   erro) e regenera `docs/data_quality.md`. Rodar de novo **não duplica nada** (ver seção 4).
+3. **Testes (`pytest`):** conferem a carga incremental, as regras da silver, as métricas da gold,
+   as checagens de integridade e o dashboard.
+4. **Dashboard (`streamlit`):** abre no navegador em `http://localhost:8501`; para encerrar,
+   `Ctrl+C`. Na primeira execução o Streamlit pode pedir um e-mail no terminal: é opcional, basta
+   apertar Enter.
 
-   ```powershell
-   New-Item -ItemType Directory -Force data\raw   # Linux / macOS: mkdir -p data/raw
-   ```
-
-3. **Rode o pipeline** (no Linux/macOS, troque `.venv\Scripts\python` por `.venv/bin/python`):
-
-   ```powershell
-   .venv\Scripts\python -m src.pipeline
-   ```
-
-   O pipeline cria `warehouse/olist.duckdb`, mostra no log quantas linhas entraram em cada etapa,
-   roda as checagens de integridade da gold (se alguma falhar, ele para com erro) e regenera
-   `docs/data_quality.md`. Rodar de novo **não duplica nada** (ver seção 4).
-
-4. **Rode os testes**
-
-   ```powershell
-   .venv\Scripts\python -m pytest
-   ```
-
-5. **Abra o dashboard** (o navegador abre em `http://localhost:8501`; para encerrar, `Ctrl+C`):
-
-   ```powershell
-   .venv\Scripts\python -m streamlit run app/dashboard.py
-   ```
-
-   Na primeira execução o Streamlit pode pedir um e-mail no terminal: é opcional, basta apertar Enter.
+> No Windows, se o `pip` falhar com `OSError` e uma dica sobre _Long Path support_, o caminho
+> da pasta ficou longo demais para alguns pacotes do Jupyter: clone numa pasta de caminho curto
+> (ex.: `C:\projetos`) ou [habilite caminhos longos](https://pip.pypa.io/warnings/enable-long-paths).
 
 > Se o arquivo `warehouse/olist.duckdb` estiver aberto em outro programa (notebook, dashboard),
 > o pipeline avisa e para: o DuckDB permite um único processo escrevendo no arquivo.
 
+**Sobre os dados:** os 9 CSVs em `data/raw/` são os originais do
+[Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce),
+sem nenhuma alteração, distribuídos sob a licença CC BY-NC-SA 4.0. Eles estão no repositório para o
+projeto rodar logo após o clone; em produção, a raw ficaria num armazenamento de objetos (ex.: S3),
+e não no Git. O arquivo `.gitattributes` impede o Git de converter as quebras de linha dos CSVs,
+para que fiquem idênticos aos originais em qualquer sistema operacional.
+
 ## 3. Estrutura do repositório
 
 ```
-├── data/raw/              # CSVs originais (não versionados)
+├── data/raw/              # os 9 CSVs originais do Kaggle, sem alterações
 ├── warehouse/             # olist.duckdb, gerado pelo pipeline (não versionado)
 ├── src/
 │   ├── config.py          # caminhos e lista de fontes e tabelas
