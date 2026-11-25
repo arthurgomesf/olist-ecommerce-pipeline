@@ -75,7 +75,7 @@ def state_chart(
                 "symbol": "line-ns-open",
                 "size": 14,
                 "line": {"width": 2},
-                "color": "#0b0b0b",
+                "color": "#777777",
             },
             hovertemplate="%{y}: prometido %{x:.1f} dias<extra></extra>",
         )

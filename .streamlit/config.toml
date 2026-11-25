@@ -1,0 +1,9 @@
+# Configuração do dashboard (lida quando o Streamlit é iniciado a partir da raiz do repositório).
+
+[server]
+# Abre direto no navegador, sem a pergunta de e-mail que o Streamlit faz na primeira execução.
+showEmailPrompt = false
+
+[browser]
+# Não envia estatísticas de uso ao Streamlit.
+gatherUsageStats = false
