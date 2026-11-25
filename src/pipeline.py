@@ -4,7 +4,9 @@
 
 Roda as etapas em ordem sobre o arquivo warehouse/olist.duckdb:
 bronze (carga incremental) -> silver (limpeza) -> regras de qualidade -> gold (modelo
-estrela) -> checagens da gold (para tudo se algo falhar) -> documentação.
+estrela) -> checagens da gold -> documentação. A gold e as checagens rodam numa transação:
+se alguma checagem falhar, a gold nova é desfeita, a anterior continua valendo e o
+pipeline para com erro.
 """
 
 import logging
@@ -32,6 +34,18 @@ def step(name: str):
     log.info("Etapa '%s' concluída em %.1fs", name, time.perf_counter() - start)
 
 
+@contextmanager
+def transaction(con: duckdb.DuckDBPyConnection):
+    """Tudo dentro do bloco vale junto: se algo falhar, nada é gravado (rollback)."""
+    con.begin()
+    try:
+        yield
+    except BaseException:
+        con.rollback()
+        raise
+    con.commit()
+
+
 def connect() -> duckdb.DuckDBPyConnection:
     """Abre (ou cria) o Data Warehouse. Falha com mensagem clara se o arquivo estiver em uso."""
     WAREHOUSE_DIR.mkdir(exist_ok=True)
@@ -56,10 +70,12 @@ def run() -> None:
             build_layer(con, "silver", SILVER_TABLES)
         with step("regras de qualidade"):
             run_quality_rules(con, batch_id, SILVER_TABLES)
-        with step("gold"):
-            build_layer(con, "gold", GOLD_TABLES)
-        with step("checagens da gold"):
-            run_checks(con, batch_id)
+        # A gold nova só é publicada se passar nas checagens; senão, fica a anterior.
+        with transaction(con):
+            with step("gold"):
+                build_layer(con, "gold", GOLD_TABLES)
+            with step("checagens da gold"):
+                run_checks(con, batch_id)
         with step("documentação"):
             write_quality_report(con, batch_id)
 
@@ -77,8 +93,11 @@ def main() -> None:
     try:
         run()
     # Erros esperados ganham mensagem limpa, sem traceback: CSVs ausentes ou dado quebrado.
-    except (FileNotFoundError, DataCheckError) as error:
+    except FileNotFoundError as error:
         log.error("%s", error)
+        sys.exit(1)
+    except DataCheckError as error:
+        log.error("%s. A gold nova foi descartada; a anterior continua valendo.", error)
         sys.exit(1)
 
 

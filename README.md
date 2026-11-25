@@ -12,7 +12,8 @@ dashboard em Streamlit.
 - **43 regras de qualidade documentadas**, com o que foi removido, corrigido ou sinalizado, o motivo
   e quantas linhas cada uma afetou, em um relatório gerado a cada execução (nenhum número digitado
   à mão).
-- **21 checagens de integridade** na gold, que param o pipeline se algo quebrar.
+- **21 checagens de integridade** na gold: se algo quebrar, a gold nova é descartada, a anterior
+  continua valendo e o pipeline para com erro.
 - **Pronto para rodar:** os dados já vêm no repositório; clonado do zero e executado com os
   comandos da seção 2, o projeto gera relatórios e gráficos idênticos aos versionados.
 - **Cinco análises**, cada uma com gráfico e conclusão de negócio, em notebook, relatório em
@@ -49,7 +50,7 @@ flowchart LR
 | **raw** (`data/raw/`) | Os CSVs originais, nunca alterados | Arquivos novos são acrescentados à pasta |
 | **bronze** | Cópia fiel dos CSVs (tudo como texto) + colunas de controle | Só recebe inserções, controladas por hash |
 | **silver** | Uma tabela limpa por entidade, com tipos corretos e flags de qualidade | Recalculada a partir da bronze a cada execução |
-| **gold** | Modelo estrela pronto para análise, com as métricas de entrega | Recalculada a partir da silver e conferida por 21 checagens |
+| **gold** | Modelo estrela pronto para análise, com as métricas de entrega | Recalculada a partir da silver e só publicada se passar nas 21 checagens |
 | **audit** | Log de cargas e resultado das regras de qualidade | A cada execução |
 
 Tudo roda localmente, sem servidor: o Data Warehouse é um único arquivo (`warehouse/olist.duckdb`).
@@ -88,8 +89,8 @@ O que cada comando faz:
 1. **Ambiente virtual e dependências:** isolam as bibliotecas do projeto, com as versões fixadas
    em `requirements.txt`.
 2. **Pipeline (`src.pipeline`):** cria `warehouse/olist.duckdb`, mostra no log quantas linhas
-   entraram em cada etapa, roda as checagens de integridade da gold (se alguma falhar, ele para com
-   erro) e regenera `docs/data_quality.md`. Rodar de novo **não duplica nada** (ver seção 4).
+   entraram em cada etapa, roda as checagens de integridade da gold (se alguma falhar, ele descarta
+   a gold nova, mantém a anterior e para com erro) e regenera `docs/data_quality.md`. Rodar de novo **não duplica nada** (ver seção 4).
 3. **Testes (`pytest`):** conferem a carga incremental, as regras da silver, as métricas da gold,
    as checagens de integridade e o dashboard.
 4. **Dashboard (`streamlit`):** abre direto no navegador em `http://localhost:8501`; para
@@ -150,7 +151,7 @@ ser reconstruído e auditado desde a origem, e cada camada tem uma única respon
 
 - **Bronze (incremental e fiel):** cada CSV entra como texto puro, sem conversão implícita (o CEP
   `01037` mantém o zero à esquerda), e cada linha ganha colunas de controle: hash do conteúdo, lote,
-  arquivo e horário. Só entram linhas com hash novo, então rodar de novamente não duplica nada e um
+  arquivo e horário. Só entram linhas com hash novo, então rodar de novo não duplica nada e um
   arquivo novo acrescenta só o que mudou. Cada arquivo entra numa transação, e um arquivo com
   colunas diferentes das esperadas é recusado.
 - **Silver (uma tabela limpa por entidade):** fica a versão mais recente de cada registro. Os tipos
@@ -269,8 +270,11 @@ Os casos que mais mudam o dado:
 
 Depois da gold, **21 checagens de integridade** conferem chaves únicas, se todo fato aponta para uma
 dimensão existente, valores dentro do domínio (nota de 1 a 5, prazo nunca negativo) e se os totais
-da gold batem com os da silver. Se alguma encontrar violações, o pipeline para com erro antes de
-gerar a documentação. O resultado também fica em [`docs/data_quality.md`](docs/data_quality.md).
+da gold batem com os da silver. A gold é recriada e conferida numa **transação**: se alguma
+checagem encontrar violações, a gold nova é desfeita (rollback), a anterior continua valendo para o
+notebook e o dashboard, e o pipeline para com erro antes de gerar a documentação. O resultado de
+cada checagem fica em `audit.check_log` (mesmo quando falha) e em
+[`docs/data_quality.md`](docs/data_quality.md).
 
 ## 6. Premissas
 
@@ -347,22 +351,22 @@ Para regenerar os gráficos e o relatório (depois do pipeline):
 
 | Tópico | Resposta |
 |---|---|
-| Vendas | A receita cresceu rápido: de janeiro a agosto de 2018, foi **141% maior** que no mesmo período de 2017. O pico foi em nov/2017, puxado pela Black Friday, e em 2018 as vendas se estabilizaram. |
-| Logística | Um pedido leva em média **12,5 dias** para chegar: 8,7 em SP e de 17,6 a 29,3 no Norte. Mesmo com um prazo prometido folgado, o Norte atrasa **8,6%** dos pedidos, acima dos 6,8% do país; no Nordeste, são 12,7%. |
+| Vendas | A receita cresceu rápido: 2017 fechou em **R$ 5,96 mi** e, de janeiro a agosto de 2018, já foram R$ 7,22 mi, **141% a mais** que no mesmo período de 2017. O pico foi em nov/2017, puxado pela Black Friday, e em 2018 as vendas se estabilizaram. |
+| Logística | Um pedido leva em média **12,5 dias** para chegar: 8,7 em SP e **22,5 no Norte**. Mesmo com um prazo prometido folgado, o Norte atrasa **8,6%** dos pedidos, acima dos 6,8% do país; no Nordeste, são 12,7%. |
 | Satisfação | Sim, e a diferença é grande: nota média **4,29** para quem recebe no prazo e **2,27** para quem recebe atrasado. Bastam 1 a 3 dias de atraso para a média cair para 3,29. |
-| Financeiro | O frete médio por pedido vai de **R$ 17,33** em SP a **R$ 48,84** na Paraíba. No Norte, chega a R$ 48,34 em Roraima, o equivalente a 28% do valor dos produtos. |
+| Financeiro | O frete médio por pedido vai de **R$ 17,33** em SP a **R$ 48,84** na Paraíba. No Norte, a média é R$ 41,35, o equivalente a 23% do valor dos produtos, contra 14% em SP. |
 | Clientes | Quase ninguém volta: só **3,0%** dos clientes compraram mais de uma vez, ou 2,2% contando apenas compras em dias diferentes. |
 
 **A história que os dados contam:** a receita cresceu rápido, mas a experiência de entrega é
 desigual entre as regiões, o atraso derruba a satisfação e quase ninguém volta a comprar.
 
-**Tópico de maior afinidade: Logística.** Foi onde os dados mais me surpreenderam: o Norte demora
-até 3,4 vezes mais que SP para receber os pedidos e, mesmo tendo a maior folga no prazo prometido,
+**Tópico de maior afinidade: Logística.** Foi onde os dados mais me surpreenderam: no Norte, a
+entrega leva em média 2,6 vezes o prazo de SP e, mesmo tendo a maior folga no prazo prometido,
 ainda atrasa acima da média do país. A logística acabou ligando as outras análises: o atraso
 derruba a nota (satisfação), e o frete é mais caro justamente onde a entrega demora mais
 (financeiro).
 
-![Tempo médio de entrega por estado do cliente: no Norte, a entrega leva até 3,4 vezes o prazo de SP](docs/figures/q2_prazo_por_estado.png)
+![Tempo médio de entrega por estado do cliente: no Norte, a entrega leva em média 2,6 vezes o prazo de SP](docs/figures/q2_prazo_por_estado.png)
 
 _Os gráficos das outras quatro análises estão no [relatório](docs/analysis_report.md)._
 

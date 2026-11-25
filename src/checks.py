@@ -1,8 +1,9 @@
 """Checagens de integridade da gold: o "portão de qualidade" do pipeline.
 
 Cada SELECT de sql/checks/gold.sql é uma checagem que conta violações (esperado: 0). Os
-resultados vão para audit.check_log. Se alguma checagem falhar, o pipeline para com erro
-antes de gerar a documentação: dado quebrado não segue adiante.
+resultados vão para audit.check_log. No pipeline, a gold é recriada e conferida dentro de
+uma transação: se alguma checagem falhar, a gold nova é desfeita (a anterior continua
+valendo) e o pipeline para com erro antes de gerar a documentação.
 """
 
 import logging
@@ -39,27 +40,29 @@ def run_checks(
     batch_id: int,
     path: Path = SQL_DIR / "checks" / "gold.sql",
 ) -> None:
-    """Roda as checagens, grava o resultado e falha se alguma encontrar violações."""
-    setup(con)
+    """Roda as checagens, grava o resultado e falha se alguma encontrar violações.
+
+    As checagens usam a conexão recebida, que enxerga a gold nova mesmo antes de ela ser
+    confirmada. Já o log é gravado por uma conexão separada (cursor), fora da transação do
+    pipeline: assim o registro da falha fica salvo mesmo quando a gold nova é desfeita.
+    """
     checks_sql = path.read_text(encoding="utf-8").strip().rstrip(";")
-    con.execute(
+    results = con.execute(
         f"""
-        INSERT INTO audit.check_log
-        SELECT ?, check_id, description, failures, ?
+        SELECT check_id, description, failures
         FROM ({checks_sql}
         )
-        """,
-        [batch_id, datetime.now()],
-    )
-    results = con.execute(
-        """
-        SELECT check_id, description, failures
-        FROM audit.check_log
-        WHERE batch_id = ?
         ORDER BY check_id
-        """,
-        [batch_id],
+        """
     ).fetchall()
+
+    checked_at = datetime.now()
+    with con.cursor() as log_con:
+        setup(log_con)
+        log_con.executemany(
+            "INSERT INTO audit.check_log VALUES (?, ?, ?, ?, ?)",
+            [(batch_id, *result, checked_at) for result in results],
+        )
 
     failed = []
     for check_id, description, failures in results:
